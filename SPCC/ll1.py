@@ -1,211 +1,94 @@
-grammar = {}
-first = {}
-follow = {}
-table = {}
+from collections import defaultdict
 
-# -------- INPUT --------
-n = int(input("Enter number of productions: "))
-print("Enter productions:")
+EPSILON = 'ε'
 
-for _ in range(n):
-    line = input()
-    left, right = line.split("->")
-    grammar[left] = right.split("|")
+# Input Grammar
+def read_grammar():
+    grammar = defaultdict(list)
+    non_terminals = []
 
-for nt in grammar:
-    first[nt] = set()
-    follow[nt] = set()
+    n = int(input("Enter number of productions: "))
 
-start = list(grammar.keys())[0]
-follow[start].add("$")
+    for _ in range(n):
+        line = input("Enter production (A->...): ").strip()
+        lhs, rhs = line.split("->")
+        lhs = lhs.strip()
 
+        if lhs not in non_terminals:
+            non_terminals.append(lhs)
 
-# -------- FIRST --------
-def find_first(symbol):
+        for prod in rhs.split("|"):
+            grammar[lhs].append(prod.strip().split())
 
-    if symbol not in grammar:
-        return {symbol}
+    return grammar, non_terminals
 
-    if len(first[symbol]) != 0:
-        return first[symbol]
 
-    for prod in grammar[symbol]:
+# Input FIRST sets
+def input_first(non_terminals):
+    first = {}
+    print("\nEnter FIRST sets:")
+    for nt in non_terminals:
+        first[nt] = set(input(f"FIRST({nt}): ").split())
+    return first
 
-        if prod == "ε":
-            first[symbol].add("ε")
 
-        else:
-            for ch in prod:
-                temp = find_first(ch)
+# Input FOLLOW sets
+def input_follow(non_terminals):
+    follow = {}
+    print("\nEnter FOLLOW sets:")
+    for nt in non_terminals:
+        follow[nt] = set(input(f"FOLLOW({nt}): ").split())
+    return follow
 
-                first[symbol] |= (temp - {"ε"})
 
-                if "ε" not in temp:
-                    break
-            else:
-                first[symbol].add("ε")
+# Compute FIRST of a production
+def first_of_string(prod, first):
+    result = set()
 
-    return first[symbol]
+    for symbol in prod:
+        if symbol not in first:  # terminal
+            result.add(symbol)
+            return result
+        result |= (first[symbol] - {EPSILON})
+        if EPSILON not in first[symbol]:
+            return result
 
+    result.add(EPSILON)
+    return result
 
-for nt in grammar:
-    find_first(nt)
 
+# Construct LL(1) table
+def construct_table(grammar, non_terminals, first, follow):
+    table = defaultdict(dict)
 
-# -------- FOLLOW --------
-changed = True
+    for nt in non_terminals:
+        for prod in grammar[nt]:
 
-while changed:
-    changed = False
+            first_set = first_of_string(prod, first)
 
-    for head in grammar:
-        for prod in grammar[head]:
+            for terminal in (first_set - {EPSILON}):
+                table[nt][terminal] = " ".join(prod)
 
-            for i in range(len(prod)):
+            if EPSILON in first_set:
+                for terminal in follow[nt]:
+                    table[nt][terminal] = "ε"
 
-                if prod[i] in grammar:
+    return table
 
-                    before = len(follow[prod[i]])
 
-                    if i + 1 < len(prod):
-                        next_symbol = prod[i + 1]
+# MAIN
+def main():
+    grammar, non_terminals = read_grammar()
+    first = input_first(non_terminals)
+    follow = input_follow(non_terminals)
 
-                        temp = find_first(next_symbol)
+    table = construct_table(grammar, non_terminals, first, follow)
 
-                        follow[prod[i]] |= (temp - {"ε"})
+    print("\n----- LL(1) Parsing Table -----")
+    for nt in table:
+        for t in table[nt]:
+            print(f"M[{nt}, {t}] = {nt} -> {table[nt][t]}")
 
-                        if "ε" in temp:
-                            follow[prod[i]] |= follow[head]
 
-                    else:
-                        if prod[i] != head:
-                            follow[prod[i]] |= follow[head]
-
-                    if len(follow[prod[i]]) > before:
-                        changed = True
-
-
-# -------- PRINT FIRST --------
-print("\nFIRST Sets:")
-for nt in first:
-    print("FIRST({}) = {}".format(nt, first[nt]))
-
-
-# -------- PRINT FOLLOW --------
-print("\nFOLLOW Sets:")
-for nt in follow:
-    print("FOLLOW({}) = {}".format(nt, follow[nt]))
-
-
-# -------- BUILD TABLE --------
-terminals = set()
-
-for head in grammar:
-    for prod in grammar[head]:
-        for ch in prod:
-            if ch not in grammar and ch != "ε":
-                terminals.add(ch)
-
-terminals.add("$")
-terminals = sorted(terminals)
-
-for nt in grammar:
-    table[nt] = {}
-    for t in terminals:
-        table[nt][t] = ""
-
-
-for head in grammar:
-
-    for prod in grammar[head]:
-
-        first_prod = set()
-
-        if prod == "ε":
-            first_prod.add("ε")
-
-        else:
-            for ch in prod:
-
-                temp = find_first(ch)
-
-                first_prod |= (temp - {"ε"})
-
-                if "ε" not in temp:
-                    break
-            else:
-                first_prod.add("ε")
-
-        for t in first_prod:
-            if t != "ε":
-                table[head][t] = prod
-
-        if "ε" in first_prod:
-            for f in follow[head]:
-                table[head][f] = "ε"
-
-
-# -------- PRINT TABLE --------
-print("\nLL(1) Parsing Table:\n")
-
-print("{:10}".format(""), end="")
-for t in terminals:
-    print("{:10}".format(t), end="")
-print()
-
-for nt in grammar:
-    print("{:10}".format(nt), end="")
-
-    for t in terminals:
-        entry = table[nt][t]
-        print("{:10}".format(entry), end="")
-
-    print()
-
-
-# -------- STACK PARSER --------
-string = input("\nEnter input string: ") + "$"
-
-stack = ["$", start]
-pointer = 0
-
-print("\nStack\t\tInput\t\tAction")
-
-while stack:
-
-    top = stack[-1]
-    current = string[pointer]
-
-    print("{:15}{:15}".format("".join(stack), string[pointer:]), end="")
-
-    if top == current:
-        stack.pop()
-        pointer += 1
-        print("Match")
-
-    elif top in grammar:
-
-        entry = table[top][current]
-
-        if entry == "":
-            print("Error")
-            print("\nString Rejected")
-            break
-
-        stack.pop()
-
-        if entry != "ε":
-            for ch in reversed(entry):
-                stack.append(ch)
-
-        print("{}->{}".format(top, entry))
-
-    else:
-        print("Error")
-        print("\nString Rejected")
-        break
-
-    if stack == ["$"] and string[pointer] == "$":
-        print("\nString Accepted")
-        break
-
+if __name__ == "__main__":
+    main()
