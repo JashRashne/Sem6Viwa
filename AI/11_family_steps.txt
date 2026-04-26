@@ -1,0 +1,91 @@
+**Steps to Implement Family Tree in Prolog**
+
+1. **Start Prolog Environment**
+   Open your Prolog interpreter (e.g., SWI-Prolog).
+
+2. **Create a Knowledge Base File**
+   Create a file with `.pl` extension (e.g., `family.pl`).
+
+3. **Define Basic Facts**
+   Add facts representing relationships such as:
+
+   * `parent(X, Y)` → X is parent of Y
+   * `male(X)` → X is male
+   * `female(X)` → X is female
+
+   Example:
+
+   ```
+   parent(john, mary).
+   parent(john, david).
+   parent(mary, alice).
+   male(john).
+   female(mary).
+   ```
+
+4. **Define Derived Relationships (Rules)**
+   Use rules to infer relationships:
+
+   * Father:
+
+     ```
+     father(X, Y) :- parent(X, Y), male(X).
+     ```
+   * Mother:
+
+     ```
+     mother(X, Y) :- parent(X, Y), female(X).
+     ```
+   * Siblings:
+
+     ```
+     sibling(X, Y) :- parent(Z, X), parent(Z, Y), X \= Y.
+     ```
+   * Grandparent:
+
+     ```
+     grandparent(X, Y) :- parent(X, Z), parent(Z, Y).
+     ```
+
+5. **Add More Complex Relations (Optional)**
+
+   * Uncle/Aunt:
+
+     ```
+     uncle(X, Y) :- sibling(X, Z), parent(Z, Y), male(X).
+     ```
+   * Ancestor (Recursive):
+
+     ```
+     ancestor(X, Y) :- parent(X, Y).
+     ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
+     ```
+
+6. **Load the Program in Prolog**
+   Use:
+
+   ```
+   ?- consult('family.pl').
+   ```
+
+7. **Execute Queries**
+   Run queries to test relationships:
+
+   ```
+   ?- father(john, mary).
+   ?- sibling(mary, david).
+   ?- grandparent(john, alice).
+   ```
+
+8. **Verify Output**
+   Prolog returns:
+
+   * `true` if relation holds
+   * `false` if not
+   * Variables if query contains unknowns
+
+9. **Modify and Extend**
+   Add more facts or rules to expand the family tree.
+
+10. **Save and Exit**
+    Save the file and exit Prolog when done.
